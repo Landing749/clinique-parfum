@@ -168,3 +168,16 @@ small{color:var(--muted);display:block;margin-top:8px}
 .center{text-align:center}
 .muted{color:var(--muted)}
 .small{font-size:13px}
+
+body { font-family: 'Helvetica Neue', sans-serif; background:#000; color:#fff; margin:0; padding:0; }
+header { text-align:center; padding:40px; background:#111; box-shadow:0 0 20px rgba(255,215,0,0.2);}
+h1, h2 { color:#FFD700; }
+.block { padding:50px; max-width:1000px; margin:0 auto; border-bottom:1px solid rgba(255,215,0,0.2); }
+.product-grid { display:flex; flex-wrap:wrap; gap:20px; }
+.product-card, .order-card { background:#111; padding:20px; border-radius:20px; border:1px solid rgba(255,215,0,0.3); flex:1 1 200px; text-align:center; }
+.product-card img { width:150px; border-radius:15px; }
+input, textarea, button { padding:10px; border-radius:10px; border:none; margin:5px 0; width:100%; max-width:300px; }
+button { background:#FFD700; color:#000; font-weight:bold; cursor:pointer; transition:0.3s; }
+button:hover { background:#e6c200; }
+.login-container { max-width:400px; margin:100px auto; text-align:center; padding:40px; background:#111; border-radius:20px; border:1px solid rgba(255,215,0,0.3);}
+
