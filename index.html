@@ -1,77 +1,94 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <title>Clinique Parfum — Shop</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clinique Parfum</title>
   <link rel="stylesheet" href="main.css">
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+  <script src="firebase.js"></script>
+
 </head>
 <body>
-  <!-- header -->
-  <header class="header">
-    <div class="brand">CLINIQUE PARFUM</div>
-    <nav>
-      <a href="index.html">Shop</a>
-      <a href="admin.html">Admin</a>
-    </nav>
-  </header>
 
-  <main class="container">
-    <h2 class="section-title">Our Collection</h2>
+<header>
+  <h1>Clinique Parfum</h1>
+</header>
 
-    <div id="productGrid" class="product-grid"></div>
-  </main>
+<section class="block">
+  <h2>About Us</h2>
+  <p>
+    Welcome to Clinique Parfum. We specialize in high-end fragrances that leave lasting impressions.
+    Each scent is crafted with precision and passion. Explore our premium collection below.
+  </p>
+</section>
 
-  <!-- Firebase config and SDK -->
-  <script src="firebase-config.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<section class="block">
+  <h2>Our Products</h2>
 
-  <script>
-    // init
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  <div id="productGrid" class="product-grid"></div>
+</section>
 
-    function formatCurrency(n){ return "₱" + Number(n).toFixed(2); }
+<section class="block">
+  <h2>Contact Us</h2>
 
-    async function loadProducts(){
-      const grid = document.getElementById('productGrid');
-      grid.innerHTML = '<div class="card">Loading products…</div>';
-      try {
-        const snap = await db.ref('products').get();
-        const data = snap.exists() ? snap.val() : {};
-        grid.innerHTML = '';
-        const entries = Object.entries(data);
-        if(entries.length === 0){
-          grid.innerHTML = '<div class="card">No products yet. Add some via admin.</div>';
-          return;
-        }
-        entries.forEach(([id, p])=>{
-          // p.image is filename like "Armstrong.png" or "product1.jpg"
-          const el = document.createElement('div');
-          el.className = 'product-card card';
-          el.innerHTML = `
-            <div class="thumb">
-              <img src="images/${p.image || ''}" alt="${p.name || ''}" onerror="this.src='images/placeholder.png'">
-            </div>
-            <div class="product-body">
-              <h3 class="product-name">${p.name || 'Unnamed'}</h3>
-              <p class="product-desc">${p.description || ''}</p>
-              <div class="row">
-                <div class="product-price">${formatCurrency(p.price||0)}</div>
-              </div>
-              <button class="btn" onclick="location.href='order.html?id=${encodeURIComponent(id)}'">Order</button>
-            </div>
-          `;
-          grid.appendChild(el);
-        });
-      } catch(err){
-        console.error(err);
-        document.getElementById('productGrid').innerHTML = '<div class="card">Failed to load products.</div>';
-      }
-    }
+  <form id="contactForm">
+    <input type="text" id="name" placeholder="Your Name" required>
+    <input type="text" id="email" placeholder="Your Email" required>
+    <textarea id="message" placeholder="Message" required></textarea>
+    <button type="submit">Send Message</button>
+  </form>
 
-    loadProducts();
-  </script>
+  <p id="contactStatus"></p>
+</section>
+
+<script>
+  const productRef = db.ref("products");
+
+  function loadProducts() {
+    const grid = document.getElementById("productGrid");
+
+    productRef.on("value", snap => {
+      grid.innerHTML = "";
+
+      snap.forEach(child => {
+        const p = child.val();
+        const id = child.key;
+
+        const card = document.createElement("div");
+        card.className = "product-card";
+
+        card.innerHTML = `
+          <img src="images/${p.image}">
+          <h3>${p.name}</h3>
+          <p class="price">₱${p.price}</p>
+          <button onclick="location.href='order.html?id=${id}'">Order</button>
+        `;
+
+        grid.appendChild(card);
+      });
+    });
+  }
+
+  loadProducts();
+
+  // CONTACT FORM — saves to /messages
+  document.getElementById("contactForm").addEventListener("submit", e => {
+    e.preventDefault();
+
+    const msgData = {
+      name: name.value,
+      email: email.value,
+      message: message.value,
+      time: Date.now()
+    };
+
+    db.ref("messages").push(msgData);
+
+    document.getElementById("contactStatus").innerText = "Message sent!";
+    e.target.reset();
+  });
+</script>
+
 </body>
 </html>
