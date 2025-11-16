@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Clinique Parfum — Order</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <header class="header">
+    <div class="brand">CLINIQUE PARFUM</div>
+    <nav>
+      <a href="index.html">Shop</a>
+      <a href="admin.html">Admin</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2 class="section-title">Confirm Order</h2>
+
+    <div id="products-container" class="card">Loading product(s)…</div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 class="small muted">Customer Details</h3>
+      <label>Full name</label>
+      <input id="cust-name" type="text" placeholder="Jane Doe">
+      <label>Phone</label>
+      <input id="cust-phone" type="tel" placeholder="+63 9xx xxx xxxx">
+      <label>Address</label>
+      <textarea id="cust-address" rows="3" placeholder="Street, City, Zip"></textarea>
+
+      <h3 class="small muted" style="margin-top:8px">Order Summary</h3>
+      <div id="summary" class="muted small">Calculating…</div>
+      <div style="margin-top:12px">
+        <button id="place-order" class="btn">Place Order</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Firebase -->
+  <script src="firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <script>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function getQueryParam(name){
+      return new URLSearchParams(window.location.search).get(name);
+    }
+    function formatCurrency(n){ return "₱" + Number(n).toFixed(2); }
+
+    const idParam = getQueryParam('id') || '';
+    const ids = idParam.split(',').map(s => s.trim()).filter(Boolean);
+
+    const container = document.getElementById('products-container');
+    const summaryDiv = document.getElementById('summary');
+    let products = []; // {id, name, price, image, description, qty}
+
+    async function fetchProduct(id){
+      const snap = await db.ref('products/' + id).get();
+      return snap.exists() ? { id, ...snap.val() } : null;
+    }
+
+    async function loadProducts(){
+      if(ids.length === 0){
+        container.innerHTML = '<div class="muted">No product selected. Go back to shop.</div>';
+        return;
+      }
+      container.innerHTML = '';
+      products = [];
+      for(const id of ids){
+        const p = await fetchProduct(id);
+        if(!p){
+          const notFound = document.createElement('div');
+          notFound.className = 'card';
+          notFound.innerHTML = `<div class="muted">Product ID "<strong>${id}</strong>" not found.</div>`;
+          container.appendChild(notFound);
+          continue;
+        }
+        p.qty = 1;
+        products.push(p);
+
+        const el = document.createElement('div');
+        el.className = 'product-card';
+        el.style.display = 'flex';
+        el.style.gap = '12px';
+        el.style.alignItems = 'center';
+        el.style.marginBottom = '10px';
+        el.innerHTML = `
+          <div style="width:110px;height:110px;flex:0 0 110px;border-radius:8px;overflow:hidden;background:#111">
+            <img src="images/${p.image || ''}" alt="${p.name || ''}" style="width:100%;height:100%;object-fit:cover" onerror="this.src='images/placeholder.png'">
+          </div>
+          <div style="flex:1">
+            <div style="font-weight:600">${p.name}</div>
+            <div class="muted small">${p.description || ''}</div>
+            <div style="margin-top:6px">${formatCurrency(p.price||0)}</div>
+          </div>
+          <div style="width:90px;text-align:center">
+            <label class="small muted">Qty</label>
+            <input class="qty" type="number" min="1" value="1" data-id="${p.id}" style="width:70px;padding:8px;border-radius:6px;border:1px solid #1a1a1a;background:#0b0b0b;color:#fff">
+          </div>
+        `;
+        container.appendChild(el);
+      }
+
+      // wire up qty inputs
+      container.querySelectorAll('.qty').forEach(inp=>{
+        inp.addEventListener('input', e=>{
+          const id = e.target.dataset.id;
+          let v = parseInt(e.target.value) || 1;
+          if(v < 1){ v = 1; e.target.value = 1; }
+          const prod = products.find(x => x.id === id);
+          if(prod){ prod.qty = v; updateSummary(); }
+        });
+      });
+
+      updateSummary();
+    }
+
+    function updateSummary(){
+      if(products.length === 0){ summaryDiv.innerHTML = '<span class="muted">No items</span>'; return; }
+      let total = 0;
+      const lines = products.map(p=>{
+        const price = Number(p.price||0);
+        const subtotal = price * (p.qty||1);
+        total += subtotal;
+        return `${p.name} ×${p.qty} — ${formatCurrency(subtotal)}`;
+      });
+      lines.push('-----------------');
+      lines.push(`<strong>Total: ${formatCurrency(total)}</strong>`);
+      summaryDiv.innerHTML = lines.join('<br>');
+    }
+
+    document.getElementById('place-order').addEventListener('click', async ()=>{
+      const name = document.getElementById('cust-name').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      const address = document.getElementById('cust-address').value.trim();
+      if(!name || !phone || !address){
+        alert('Please provide name, phone and address.');
+        return;
+      }
+      if(products.length === 0){ alert('No valid products selected.'); return; }
+
+      const items = products.map(p=>({
+        productId: p.id,
+        name: p.name,
+        price: Number(p.price||0),
+        qty: Number(p.qty||1),
+        subtotal: Number(p.price||0) * Number(p.qty||1)
+      }));
+      const total = items.reduce((s,i)=>s+i.subtotal,0);
+
+      const order = {
+        items,
+        total,
+        customer: { name, phone, address },
+        status: 'pending',
+        createdAt: Date.now()
+      };
+
+      try {
+        const newRef = await db.ref('orders').push(order);
+        alert('Order placed! ID: ' + newRef.key);
+        window.location.href = 'thankyou.html?orderId=' + newRef.key;
+      } catch(err){
+        console.error(err);
+        alert('Failed to place order. Try again.');
+      }
+    });
+
+    // start
+    loadProducts();
+  </script>
+</body>
+</html>
