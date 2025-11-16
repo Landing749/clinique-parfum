@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Clinique Parfum — Shop</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <!-- header -->
+  <header class="header">
+    <div class="brand">CLINIQUE PARFUM</div>
+    <nav>
+      <a href="index.html">Shop</a>
+      <a href="admin.html">Admin</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2 class="section-title">Our Collection</h2>
+
+    <div id="productGrid" class="product-grid"></div>
+  </main>
+
+  <!-- Firebase config and SDK -->
+  <script src="firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <script>
+    // init
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function formatCurrency(n){ return "₱" + Number(n).toFixed(2); }
+
+    async function loadProducts(){
+      const grid = document.getElementById('productGrid');
+      grid.innerHTML = '<div class="card">Loading products…</div>';
+      try {
+        const snap = await db.ref('products').get();
+        const data = snap.exists() ? snap.val() : {};
+        grid.innerHTML = '';
+        const entries = Object.entries(data);
+        if(entries.length === 0){
+          grid.innerHTML = '<div class="card">No products yet. Add some via admin.</div>';
+          return;
+        }
+        entries.forEach(([id, p])=>{
+          // p.image is filename like "Armstrong.png" or "product1.jpg"
+          const el = document.createElement('div');
+          el.className = 'product-card card';
+          el.innerHTML = `
+            <div class="thumb">
+              <img src="images/${p.image || ''}" alt="${p.name || ''}" onerror="this.src='images/placeholder.png'">
+            </div>
+            <div class="product-body">
+              <h3 class="product-name">${p.name || 'Unnamed'}</h3>
+              <p class="product-desc">${p.description || ''}</p>
+              <div class="row">
+                <div class="product-price">${formatCurrency(p.price||0)}</div>
+              </div>
+              <button class="btn" onclick="location.href='order.html?id=${encodeURIComponent(id)}'">Order</button>
+            </div>
+          `;
+          grid.appendChild(el);
+        });
+      } catch(err){
+        console.error(err);
+        document.getElementById('productGrid').innerHTML = '<div class="card">Failed to load products.</div>';
+      }
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>
