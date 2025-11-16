@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login - Clinique Parfum</title>
+<link rel="stylesheet" href="main.css">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+<script src="firebase.js"></script>
+</head>
+<body>
+<div class="login-container">
+  <h1>Admin Login</h1>
+  <form id="loginForm">
+    <input type="password" id="password" placeholder="Enter Admin Password" required>
+    <button type="submit">Login</button>
+  </form>
+  <p id="loginStatus"></p>
+</div>
+
+<script>
+const loginForm = document.getElementById("loginForm");
+const loginStatus = document.getElementById("loginStatus");
+
+loginForm.addEventListener("submit", e => {
+  e.preventDefault();
+  const pwd = document.getElementById("password").value;
+
+  if (pwd === ADMIN_PASSWORD) {
+    window.location.href = "admin.html";
+  } else {
+    loginStatus.innerText = "Incorrect password.";
+    loginStatus.style.color = "red";
+  }
+});
+</script>
+</body>
+</html>
