@@ -1,246 +1,102 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Admin — Clinique Parfum</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="main.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard - Clinique Parfum</title>
+<link rel="stylesheet" href="main.css">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+<script src="firebase.js"></script>
 </head>
 <body>
-  <header class="header">
-    <div class="brand">CLINIQUE PARFUM — Admin</div>
-    <nav>
-      <a href="index.html">Open shop</a>
-    </nav>
-  </header>
+<header>
+  <h1>Admin Dashboard</h1>
+</header>
 
-  <main class="container">
-    <h2 class="section-title">Products — Add / Delete / List</h2>
+<section class="block">
+  <h2>Add Product</h2>
+  <form id="addProductForm">
+    <input type="text" id="prodName" placeholder="Product Name" required>
+    <input type="number" id="prodPrice" placeholder="Price" required>
+    <input type="text" id="prodImage" placeholder="Image Filename (e.g. Armstrong.png)" required>
+    <button type="submit">Add Product</button>
+  </form>
+  <p id="addStatus"></p>
+</section>
 
-    <div class="card" style="margin-bottom:16px">
-      <form id="addProductForm">
-        <div class="form-row">
-          <div class="field">
-            <label>Product ID (unique)</label>
-            <input id="prod-id" type="text" placeholder="e.g. prod1 or 1" required>
-            <small class="muted">IDs are used in order links (order.html?id=ID)</small>
-          </div>
-          <div class="field">
-            <label>Name</label>
-            <input id="prod-name" type="text" placeholder="Royal Essence" required>
-          </div>
-        </div>
+<section class="block">
+  <h2>Existing Products</h2>
+  <div id="productList" class="product-grid"></div>
+</section>
 
-        <div class="form-row" style="margin-top:10px">
-          <div class="field">
-            <label>Price (numbers only)</label>
-            <input id="prod-price" type="number" placeholder="2599" required>
-          </div>
-          <div class="field">
-            <label>Image filename (in /images)</label>
-            <input id="prod-image" type="text" placeholder="Armstrong.png" required>
-            <small class="muted">Image should be placed in /images/ folder</small>
-          </div>
-        </div>
+<section class="block">
+  <h2>Orders</h2>
+  <div id="orderList"></div>
+</section>
 
-        <div style="margin-top:10px">
-          <label>Description</label>
-          <textarea id="prod-desc" rows="2" placeholder="Short product description"></textarea>
-        </div>
+<script>
+const productRef = db.ref("products");
+const orderRef = db.ref("orders");
 
-        <div style="margin-top:12px">
-          <button class="btn" type="submit">Add / Update Product</button>
-        </div>
-        <div id="addStatus" class="muted small" style="margin-top:8px"></div>
-      </form>
-    </div>
+// ADD PRODUCT
+document.getElementById("addProductForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const name = document.getElementById("prodName").value;
+  const price = document.getElementById("prodPrice").value;
+  const image = document.getElementById("prodImage").value;
 
-    <div class="card" style="margin-bottom:18px">
-      <h3 class="small muted">Delete Product</h3>
-      <div class="form-row" style="align-items:center">
-        <input id="delete-id" type="text" placeholder="Product ID to delete">
-        <button id="deleteBtn" class="btn" style="width:auto">Delete</button>
-      </div>
-      <small class="muted">This removes the product from the database. Image file stays in /images.</small>
-    </div>
+  const newProd = { name, price, image };
+  productRef.push(newProd);
+  document.getElementById("addStatus").innerText = "Product added!";
+  e.target.reset();
+});
 
-    <div class="card" style="margin-bottom:18px">
-      <h3 class="small muted">Existing Products</h3>
-      <div id="productsList" class="product-grid" style="margin-top:12px"></div>
-    </div>
+// LIST PRODUCTS + DELETE
+function loadProducts() {
+  const list = document.getElementById("productList");
+  productRef.on("value", snap => {
+    list.innerHTML = "";
+    snap.forEach(child => {
+      const p = child.val();
+      const id = child.key;
 
-    <h2 class="section-title">Orders — Live</h2>
-    <div class="card">
-      <div id="ordersList" class="orders-list">Loading orders…</div>
-    </div>
-  </main>
-
-  <!-- Firebase -->
-  <script src="firebase-config.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
-  <script>
-    // basic admin gate
-    const pw = prompt('Admin password:');
-    if(pw !== ADMIN_PASSWORD){
-      document.body.innerHTML = '<div style="padding:40px;text-align:center"><h2>Unauthorized</h2><p>Incorrect password.</p></div>';
-      throw new Error('Unauthorized');
-    }
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    function formatCurrency(n){ return "₱" + Number(n).toFixed(2); }
-
-    // Add / update product
-    document.getElementById('addProductForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const id = document.getElementById('prod-id').value.trim();
-      const name = document.getElementById('prod-name').value.trim();
-      const price = Number(document.getElementById('prod-price').value) || 0;
-      const image = document.getElementById('prod-image').value.trim();
-      const desc = document.getElementById('prod-desc').value.trim();
-      if(!id || !name || !image){
-        document.getElementById('addStatus').innerText = 'Please fill required fields.';
-        return;
-      }
-      try {
-        await db.ref('products/' + id).set({
-          name, price, image, description: desc
-        });
-        document.getElementById('addStatus').innerText = 'Saved.';
-        loadProducts();
-      } catch(err){
-        console.error(err);
-        document.getElementById('addStatus').innerText = 'Failed to save.';
-      }
+      const card = document.createElement("div");
+      card.className = "product-card";
+      card.innerHTML = `
+        <img src="images/${p.image}">
+        <h3>${p.name}</h3>
+        <p class="price">₱${p.price}</p>
+        <button onclick="deleteProduct('${id}')">Delete</button>
+      `;
+      list.appendChild(card);
     });
+  });
+}
 
-    // Delete product
-    document.getElementById('deleteBtn').addEventListener('click', async (e)=>{
-      e.preventDefault();
-      const id = document.getElementById('delete-id').value.trim();
-      if(!id){ alert('Enter product id to delete'); return; }
-      if(!confirm('Delete product ' + id + '?')) return;
-      try {
-        await db.ref('products/' + id).remove();
-        alert('Deleted ' + id);
-        loadProducts();
-      } catch(err){
-        console.error(err);
-        alert('Failed to delete product.');
-      }
-    });
+function deleteProduct(id){
+  productRef.child(id).remove();
+}
 
-    // load products list
-    async function loadProducts(){
-      const grid = document.getElementById('productsList');
-      grid.innerHTML = '<div class="muted">Loading…</div>';
-      try {
-        const snap = await db.ref('products').get();
-        const data = snap.exists() ? snap.val() : {};
-        grid.innerHTML = '';
-        const entries = Object.entries(data);
-        if(entries.length === 0){
-          grid.innerHTML = '<div class="muted">No products.</div>';
-          return;
-        }
-        entries.forEach(([id,p])=>{
-          const card = document.createElement('div');
-          card.className = 'product-card card';
-          card.innerHTML = `
-            <div class="thumb" style="height:160px">
-              <img src="images/${p.image || ''}" alt="${p.name||''}" onerror="this.src='images/placeholder.png'">
-            </div>
-            <div class="product-body">
-              <div style="display:flex;gap:8px;align-items:center">
-                <div style="flex:1">
-                  <div style="font-weight:700">${p.name}</div>
-                  <div class="muted small">${p.description || ''}</div>
-                </div>
-                <div style="text-align:right">
-                  <div class="muted small">ID</div>
-                  <div style="font-weight:700">${id}</div>
-                </div>
-              </div>
-              <div style="display:flex;gap:8px;margin-top:10px">
-                <div class="muted small">Price</div>
-                <div style="font-weight:700">${formatCurrency(p.price||0)}</div>
-              </div>
-            </div>
-          `;
-          grid.appendChild(card);
-        });
-      } catch(err){
-        console.error(err);
-        grid.innerHTML = '<div class="muted">Failed to load products</div>';
-      }
-    }
+loadProducts();
 
-    // listen to orders
-    function listenOrders(){
-      const ordersDiv = document.getElementById('ordersList');
-      const ref = db.ref('orders');
-      ref.on('value', snapshot => {
-        const orders = snapshot.exists() ? snapshot.val() : {};
-        ordersDiv.innerHTML = '';
-        const entries = Object.entries(orders).sort((a,b)=> (b[1].createdAt||0) - (a[1].createdAt||0));
-        if(entries.length === 0){
-          ordersDiv.innerHTML = '<div class="muted">No orders yet.</div>';
-          return;
-        }
-        entries.forEach(([orderId, order])=>{
-          const el = document.createElement('div');
-          el.className = 'order-item';
-          const created = new Date(order.createdAt || Date.now()).toLocaleString();
-          el.innerHTML = `
-            <div class="order-meta">
-              <div><strong>Order:</strong> ${orderId}</div>
-              <div class="muted small">${created}</div>
-            </div>
-            <div><strong>${order.customer?.name || ''}</strong> — ${order.customer?.phone || ''}</div>
-            <div class="muted small">${order.customer?.address || ''}</div>
-            <div class="order-items small" style="margin-top:8px">
-              ${(order.items || []).map(i=>`${i.name} ×${i.qty} — ${formatCurrency(i.subtotal)}`).join('<br>')}
-            </div>
-            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-              <div style="font-weight:700">${formatCurrency(order.total||0)}</div>
-              <div class="right">
-                <select data-orderid="${orderId}" style="padding:8px;border-radius:6px;border:1px solid #1a1a1a;background:#0b0b0b;color:#fff">
-                  <option value="pending">Pending</option>
-                  <option value="packed">Packed</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                <button data-delete="${orderId}" style="background:#ff5b5b;padding:8px 10px;border-radius:6px;border:none;color:#000">Delete</button>
-              </div>
-            </div>
-          `;
-          // set status
-          const sel = el.querySelector('select');
-          sel.value = order.status || 'pending';
-          sel.addEventListener('change', async (e)=>{
-            const newStatus = e.target.value;
-            try { await db.ref('orders/' + orderId + '/status').set(newStatus); }
-            catch(err){ console.error(err); alert('Failed to update status'); }
-          });
-          // delete
-          el.querySelector('[data-delete]').addEventListener('click', async ()=>{
-            if(!confirm('Delete order ' + orderId + '?')) return;
-            try { await db.ref('orders/' + orderId).remove(); }
-            catch(err){ console.error(err); alert('Failed to delete'); }
-          });
-
-          ordersDiv.appendChild(el);
-        });
-      });
-    }
-
-    // start
-    loadProducts();
-    listenOrders();
-  </script>
+// LOAD ORDERS
+const orderList = document.getElementById("orderList");
+orderRef.on("value", snap => {
+  orderList.innerHTML = "";
+  snap.forEach(child => {
+    const o = child.val();
+    const div = document.createElement("div");
+    div.className = "order-card";
+    div.innerHTML = `
+      <p><strong>${o.name}</strong> ordered <em>${o.products.join(", ")}</em></p>
+      <p>Email: ${o.email}</p>
+      <p>Phone: ${o.phone}</p>
+      <p>Time: ${new Date(o.time).toLocaleString()}</p>
+    `;
+    orderList.appendChild(div);
+  });
+});
+</script>
 </body>
 </html>
